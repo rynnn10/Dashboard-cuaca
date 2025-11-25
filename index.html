@@ -3,284 +3,357 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuaca & Peta Interaktif</title>
+    <title>Cuaca Presisi & Lokasi Saya</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Leaflet CSS (Peta) -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
-    <!-- FontAwesome (Ikon) -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
             min-height: 100vh;
             color: white;
         }
 
-        /* Glassmorphism Effect */
-        .glass {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 1rem;
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1); 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3); 
-            border-radius: 4px;
-        }
-
-        #map {
-            z-index: 1; /* Ensure map stays below fixed headers if any */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top: 3px solid #fbbf24;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
         }
         
-        /* Animation */
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom Popup Map Style */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: rgba(30, 30, 30, 0.9);
+            color: white;
+            backdrop-filter: blur(5px);
         }
     </style>
 </head>
-<body class="p-4 md:p-8 flex items-center justify-center">
+<body class="p-4 flex flex-col items-center justify-center min-h-screen">
 
-    <div class="container mx-auto max-w-6xl">
+    <div class="w-full max-w-6xl space-y-6">
         
-        <!-- Header & Search -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <h1 class="text-3xl font-bold flex items-center gap-2">
-                <i class="fa-solid fa-cloud-bolt text-yellow-400"></i> SkyCast
-            </h1>
-            
-            <div class="relative w-full md:w-96">
-                <input type="text" id="searchInput" placeholder="Cari kota (contoh: Jakarta)..." 
-                    class="w-full py-3 px-5 rounded-full bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-lg">
-                <button onclick="handleSearch()" class="absolute right-2 top-1.5 bg-yellow-400 hover:bg-yellow-500 text-blue-900 rounded-full p-2 w-10 h-10 flex items-center justify-center transition">
-                    <i class="fa-solid fa-search"></i>
+        <!-- Top Bar: Search & My Location -->
+        <div class="flex flex-col md:flex-row gap-4 justify-between items-center glass-panel p-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-yellow-400 to-orange-500 p-2 rounded-lg text-white shadow-lg shadow-orange-500/20">
+                    <i class="fa-solid fa-map-location-dot text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-wide">GeoWeather <span class="text-yellow-400 font-light">Precision</span></h1>
+            </div>
+
+            <div class="flex w-full md:w-auto gap-2">
+                <button onclick="getMyLocation()" id="btnLoc" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full transition flex items-center gap-2 shadow-lg shadow-blue-500/30 whitespace-nowrap">
+                    <i class="fa-solid fa-crosshairs"></i> <span class="hidden sm:inline">Lokasi Saya</span>
                 </button>
-            </div>
-        </div>
-
-        <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
-            
-            <!-- Left Column: Current Weather -->
-            <div class="glass p-6 flex flex-col justify-between h-full relative overflow-hidden">
-                <div class="absolute -top-10 -right-10 w-40 h-40 bg-yellow-400 rounded-full blur-3xl opacity-20"></div>
                 
-                <div>
-                    <h2 id="cityName" class="text-2xl font-semibold mb-1">Jakarta</h2>
-                    <p id="currentDate" class="text-sm text-gray-200">Selasa, 25 Nov 2025</p>
-                </div>
-
-                <div class="flex flex-col items-center my-8">
-                    <i id="weatherIcon" class="fa-solid fa-cloud-sun text-8xl mb-4 text-yellow-300 drop-shadow-lg"></i>
-                    <h1 id="tempDisplay" class="text-6xl font-bold">30°C</h1>
-                    <p id="weatherDesc" class="text-xl font-medium mt-2">Cerah Berawan</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 mt-auto">
-                    <div class="bg-white/10 p-3 rounded-lg text-center">
-                        <i class="fa-solid fa-wind mb-1 text-gray-300"></i>
-                        <p class="text-xs text-gray-300">Angin</p>
-                        <p id="windSpeed" class="font-bold">10 km/h</p>
-                    </div>
-                    <div class="bg-white/10 p-3 rounded-lg text-center">
-                        <i class="fa-solid fa-droplet mb-1 text-blue-300"></i>
-                        <p class="text-xs text-gray-300">Kelembaban</p>
-                        <p id="humidity" class="font-bold">65%</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Middle Column: Map -->
-            <div class="glass p-2 h-[400px] lg:h-auto lg:col-span-2 flex flex-col relative">
-                <div id="map" class="w-full h-full rounded-xl shadow-inner border border-white/10"></div>
-                <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur px-3 py-1 rounded text-xs z-[1000] pointer-events-none">
-                    <i class="fa-solid fa-mouse-pointer"></i> Klik peta untuk cek cuaca lokasi lain
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Bottom: Weekly Forecast (Simple) -->
-        <div class="mt-6 glass p-6">
-            <h3 class="text-lg font-semibold mb-4 border-b border-white/20 pb-2">Prakiraan 3 Hari Ke Depan</h3>
-            <div id="forecastContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- Forecast Items will be injected here -->
-                <div class="text-center p-4 bg-white/5 rounded-lg animate-pulse">
-                    Loading data...
+                <div class="relative w-full md:w-80">
+                    <input type="text" id="searchInput" placeholder="Cari Desa/Kecamatan..." 
+                        class="w-full bg-white/10 border border-white/20 rounded-full px-5 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm placeholder-gray-400 transition-all">
+                    <button onclick="handleSearch()" class="absolute right-1 top-1 bg-white/10 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <footer class="text-center mt-8 text-gray-400 text-sm">
-            &copy; 2025 SkyCast Dashboard. Data by Open-Meteo.
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Main Weather Card -->
+            <div class="lg:col-span-4 glass-panel p-8 flex flex-col justify-between relative overflow-hidden min-h-[450px]">
+                <!-- Background Blob -->
+                <div class="absolute -top-20 -left-20 w-64 h-64 bg-blue-500 rounded-full blur-[100px] opacity-20"></div>
+                <div class="absolute bottom-0 right-0 w-40 h-40 bg-yellow-500 rounded-full blur-[80px] opacity-10"></div>
+
+                <div class="relative z-10">
+                    <div class="flex items-start gap-2 mb-1">
+                        <i class="fa-solid fa-location-dot text-red-400 mt-1 animate-bounce"></i>
+                        <div>
+                            <!-- Lokasi Lebih Spesifik -->
+                            <h2 id="locationDetail" class="text-xl font-bold leading-tight">Mendeteksi lokasi...</h2>
+                            <p id="locationSub" class="text-xs text-gray-400 mt-1">Koordinat: -</p>
+                        </div>
+                    </div>
+                    <p id="currentDate" class="text-sm text-gray-300 mt-4 border-l-2 border-yellow-400 pl-3">Selasa, 25 Nov 2025</p>
+                </div>
+
+                <div class="relative z-10 flex flex-col items-center justify-center my-6">
+                    <i id="weatherIcon" class="fa-solid fa-circle-notch fa-spin text-6xl text-gray-400 mb-4"></i>
+                    <div class="text-center">
+                        <h1 id="tempMain" class="text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400">--°</h1>
+                        <p id="weatherDesc" class="text-lg font-medium text-yellow-300 mt-2">Menunggu Data</p>
+                    </div>
+                </div>
+
+                <div class="relative z-10 grid grid-cols-3 gap-2 mt-auto text-center">
+                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
+                        <i class="fa-solid fa-wind text-gray-400 text-xs"></i>
+                        <p id="windSpeed" class="font-bold text-sm mt-1">--</p>
+                    </div>
+                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
+                        <i class="fa-solid fa-droplet text-blue-400 text-xs"></i>
+                        <p id="humidity" class="font-bold text-sm mt-1">--</p>
+                    </div>
+                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
+                        <i class="fa-solid fa-eye text-green-400 text-xs"></i>
+                        <p id="visibility" class="font-bold text-sm mt-1">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Section -->
+            <div class="lg:col-span-8 glass-panel p-2 h-[400px] lg:h-auto relative group">
+                <div id="map" class="w-full h-full rounded-2xl z-0 filter brightness-90 group-hover:brightness-100 transition duration-500"></div>
+                <div class="absolute top-4 right-4 z-[500] bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg text-xs border border-white/10 shadow-xl">
+                    <i class="fa-solid fa-info-circle text-blue-400 mr-1"></i> Klik peta untuk cek cuaca desa/jalan lain
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Forecast -->
+        <div class="glass-panel p-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <i class="fa-regular fa-calendar-days text-yellow-400"></i> Prakiraan Mingguan
+            </h3>
+            <div id="forecastContainer" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <!-- Data injected by JS -->
+            </div>
+        </div>
+
+        <footer class="text-center text-xs text-gray-500 pb-4">
+            Data Cuaca by Open-Meteo • Peta by OpenStreetMap & Nominatim
         </footer>
-
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <script>
-        // --- Inisialisasi Peta ---
-        const map = L.map('map').setView([-6.2088, 106.8456], 10); // Default Jakarta
+        // --- Setup Map ---
+        const map = L.map('map', { zoomControl: false }).setView([-6.200, 106.816], 13);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        // Tile Layer yang lebih gelap/elegan
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
-        let marker = L.marker([-6.2088, 106.8456]).addTo(map);
+        let currentMarker = L.marker([-6.200, 106.816]).addTo(map);
 
-        // --- Helper: Konversi Kode WMO ke Ikon & Deskripsi ---
-        function getWeatherDetails(code) {
-            // WMO Weather interpretation codes (WW)
+        // --- Utils: Weather Codes ---
+        function getWeatherInfo(code) {
             const codes = {
-                0: { desc: "Cerah Langit Biru", icon: "fa-sun", color: "text-yellow-400" },
-                1: { desc: "Cerah Utama", icon: "fa-cloud-sun", color: "text-yellow-300" },
-                2: { desc: "Berawan Sebagian", icon: "fa-cloud", color: "text-gray-200" },
-                3: { desc: "Mendung", icon: "fa-cloud", color: "text-gray-400" },
-                45: { desc: "Kabut", icon: "fa-smog", color: "text-gray-300" },
-                48: { desc: "Kabut Rime", icon: "fa-smog", color: "text-gray-300" },
-                51: { desc: "Gerimis Ringan", icon: "fa-cloud-rain", color: "text-blue-300" },
-                53: { desc: "Gerimis Sedang", icon: "fa-cloud-rain", color: "text-blue-300" },
-                55: { desc: "Gerimis Lebat", icon: "fa-cloud-showers-heavy", color: "text-blue-400" },
-                61: { desc: "Hujan Ringan", icon: "fa-cloud-rain", color: "text-blue-400" },
+                0: { desc: "Cerah Total", icon: "fa-sun", color: "text-yellow-400" },
+                1: { desc: "Cerah Berawan", icon: "fa-cloud-sun", color: "text-yellow-200" },
+                2: { desc: "Berawan", icon: "fa-cloud", color: "text-gray-300" },
+                3: { desc: "Mendung Gelap", icon: "fa-cloud", color: "text-gray-500" },
+                45: { desc: "Berkabut", icon: "fa-smog", color: "text-gray-400" },
+                51: { desc: "Gerimis Halus", icon: "fa-cloud-rain", color: "text-blue-300" },
+                61: { desc: "Hujan Ringan", icon: "fa-umbrella", color: "text-blue-400" },
                 63: { desc: "Hujan Sedang", icon: "fa-cloud-showers-heavy", color: "text-blue-500" },
                 65: { desc: "Hujan Lebat", icon: "fa-cloud-showers-water", color: "text-blue-600" },
-                80: { desc: "Hujan Lokal", icon: "fa-cloud-sun-rain", color: "text-blue-400" },
-                95: { desc: "Badai Petir", icon: "fa-bolt", color: "text-yellow-500" },
-                96: { desc: "Badai Petir & Hujan Es", icon: "fa-poo-storm", color: "text-purple-400" }
+                80: { desc: "Hujan Lokal", icon: "fa-cloud-sun-rain", color: "text-indigo-400" },
+                95: { desc: "Badai Petir", icon: "fa-bolt", color: "text-yellow-500" }
             };
-            return codes[code] || { desc: "Tidak Diketahui", icon: "fa-question", color: "text-white" };
+            return codes[code] || { desc: "Tidak Diketahui", icon: "fa-meteor", color: "text-white" };
         }
 
-        // --- Fungsi Utama Fetch Data Cuaca ---
-        async function fetchWeather(lat, lon, cityName = "Lokasi Terpilih") {
+        // --- 1. Fungsi Reverse Geocoding (Cari Nama Desa/Jalan) ---
+        async function getPlaceName(lat, lon) {
+            // Menggunakan Nominatim OpenStreetMap (Gratis)
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+            
             try {
-                // 1. Update Map
-                map.setView([lat, lon], 13);
-                marker.setLatLng([lat, lon]);
-
-                // 2. Fetch API Open-Meteo
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
-                
-                const response = await fetch(url);
+                const response = await fetch(url, { headers: { 'Accept-Language': 'id' } });
                 const data = await response.json();
-
-                // 3. Update UI Saat Ini
-                const current = data.current;
-                const daily = data.daily;
-                const weatherInfo = getWeatherDetails(current.weather_code);
-
-                document.getElementById('cityName').innerText = cityName;
-                document.getElementById('tempDisplay').innerText = `${Math.round(current.temperature_2m)}°C`;
-                document.getElementById('weatherDesc').innerText = weatherInfo.desc;
-                document.getElementById('windSpeed').innerText = `${current.wind_speed_10m} km/h`;
-                document.getElementById('humidity').innerText = `${current.relative_humidity_2m}%`;
                 
-                // Update Icon Class
-                const iconEl = document.getElementById('weatherIcon');
-                iconEl.className = `fa-solid ${weatherInfo.icon} text-8xl mb-4 ${weatherInfo.color} drop-shadow-lg`;
+                if (data && data.address) {
+                    // Prioritas penamaan: Desa/Kelurahan -> Kecamatan -> Kota
+                    const addr = data.address;
+                    const village = addr.village || addr.suburb || addr.hamlet || addr.neighbourhood;
+                    const road = addr.road || "";
+                    const city = addr.city || addr.town || addr.county || addr.state_district;
+                    
+                    let mainName = village ? village : (road ? road : city);
+                    let subName = city !== mainName ? city : addr.state;
 
-                // Update Tanggal
-                const dateOptions = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
-                document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', dateOptions);
+                    // Jika tidak ada data spesifik, gunakan display_name yang dipotong
+                    if (!mainName) mainName = data.name || "Lokasi Terpilih";
 
-                // 4. Update UI Forecast (3 Hari)
-                const forecastContainer = document.getElementById('forecastContainer');
-                forecastContainer.innerHTML = ''; // Clear lama
-
-                for(let i = 1; i <= 3; i++) {
-                    const fCode = daily.weather_code[i];
-                    const fMax = Math.round(daily.temperature_2m_max[i]);
-                    const fMin = Math.round(daily.temperature_2m_min[i]);
-                    const fInfo = getWeatherDetails(fCode);
-                    const fDate = new Date(daily.time[i]).toLocaleDateString('id-ID', { weekday: 'long' });
-
-                    const div = document.createElement('div');
-                    div.className = "glass p-4 text-center hover:bg-white/10 transition";
-                    div.innerHTML = `
-                        <p class="text-sm font-semibold mb-2">${fDate}</p>
-                        <i class="fa-solid ${fInfo.icon} text-3xl mb-2 ${fInfo.color}"></i>
-                        <p class="text-xs text-gray-300 mb-1">${fInfo.desc}</p>
-                        <p class="font-bold">${fMax}°C <span class="text-xs text-gray-400 font-normal">/ ${fMin}°C</span></p>
-                    `;
-                    forecastContainer.appendChild(div);
+                    return { main: mainName, sub: subName || data.display_name.split(',')[1] };
                 }
-
+                return { main: "Wilayah Tidak Bernama", sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
             } catch (error) {
-                console.error("Error fetching weather:", error);
-                alert("Gagal mengambil data cuaca.");
+                console.error("Geocoding error:", error);
+                return { main: "Lokasi Peta", sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
             }
         }
 
-        // --- Fungsi Cari Kota (Geocoding) ---
+        // --- 2. Fungsi Utama Fetch Cuaca ---
+        async function fetchWeather(lat, lon, autoName = true) {
+            // Update UI Loading
+            document.getElementById('weatherDesc').innerHTML = '<span class="text-sm italic">Mengambil data...</span>';
+            
+            // Pindahkan Peta
+            map.setView([lat, lon], 14);
+            currentMarker.setLatLng([lat, lon]);
+
+            // Ambil Nama Tempat (Jika diminta auto)
+            if (autoName) {
+                document.getElementById('locationDetail').innerText = "Melacak alamat...";
+                const place = await getPlaceName(lat, lon);
+                document.getElementById('locationDetail').innerText = place.main;
+                document.getElementById('locationSub').innerText = place.sub;
+            }
+
+            try {
+                // API Open Meteo
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                const current = data.current;
+                const info = getWeatherInfo(current.weather_code);
+
+                // Render Main Weather
+                document.getElementById('tempMain').innerText = Math.round(current.temperature_2m) + "°";
+                document.getElementById('weatherDesc').innerText = info.desc;
+                document.getElementById('windSpeed').innerText = current.wind_speed_10m + " km/h";
+                document.getElementById('humidity').innerText = current.relative_humidity_2m + "%";
+                
+                // Konversi visibilitas (meter ke km jika perlu)
+                const visKm = current.visibility ? (current.visibility / 1000).toFixed(1) + " km" : "-";
+                document.getElementById('visibility').innerText = visKm;
+
+                const iconEl = document.getElementById('weatherIcon');
+                iconEl.className = `fa-solid ${info.icon} text-6xl mb-4 ${info.color} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] fade-in`;
+
+                document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', { 
+                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
+                });
+
+                // Render Forecast
+                const daily = data.daily;
+                const container = document.getElementById('forecastContainer');
+                container.innerHTML = "";
+
+                for(let i = 1; i <= 6; i++) {
+                    const dInfo = getWeatherInfo(daily.weather_code[i]);
+                    const dDate = new Date(daily.time[i]).toLocaleDateString('id-ID', { weekday: 'short' });
+                    
+                    const div = document.createElement('div');
+                    div.className = "bg-white/5 rounded-xl p-3 text-center border border-white/5 hover:bg-white/10 transition";
+                    div.innerHTML = `
+                        <p class="text-xs text-gray-400 mb-1">${dDate}</p>
+                        <i class="fa-solid ${dInfo.icon} text-xl my-2 ${dInfo.color}"></i>
+                        <div class="flex justify-center gap-2 text-sm font-bold">
+                            <span>${Math.round(daily.temperature_2m_max[i])}°</span>
+                            <span class="text-gray-500">${Math.round(daily.temperature_2m_min[i])}°</span>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Gagal memuat data cuaca.");
+            }
+        }
+
+        // --- 3. Fitur Geolocation (Lokasi Saya) ---
+        function getMyLocation() {
+            const btn = document.getElementById('btnLoc');
+            const originalText = btn.innerHTML;
+            
+            if (!navigator.geolocation) {
+                alert("Browser anda tidak mendukung Geolocation.");
+                return;
+            }
+
+            btn.innerHTML = '<div class="loader"></div>';
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    fetchWeather(latitude, longitude, true); // True = auto cari nama jalan
+                    btn.innerHTML = originalText;
+                },
+                (error) => {
+                    let msg = "Gagal mendeteksi lokasi.";
+                    if (error.code === 1) msg = "Izin lokasi ditolak. Mohon izinkan akses lokasi di browser.";
+                    alert(msg);
+                    btn.innerHTML = originalText;
+                },
+                { enableHighAccuracy: true } // Minta akurasi tinggi (GPS)
+            );
+        }
+
+        // --- 4. Search Handler ---
         async function handleSearch() {
             const query = document.getElementById('searchInput').value;
             if(!query) return;
 
-            // Efek Loading sederhana pada tombol
-            const btn = document.querySelector('button');
-            const originalIcon = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
+            // Cari koordinat kota/kecamatan dulu via Open-Meteo Geocoding
             try {
-                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=1&language=id&format=json`;
-                const res = await fetch(geoUrl);
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=1&language=id&format=json`);
                 const data = await res.json();
-
-                if(data.results && data.results.length > 0) {
-                    const result = data.results[0];
-                    const cityLabel = `${result.name}, ${result.country || ''}`;
-                    await fetchWeather(result.latitude, result.longitude, cityLabel);
+                
+                if(data.results) {
+                    const { latitude, longitude, name, admin1 } = data.results[0];
+                    // Manual set nama karena hasil search user
+                    document.getElementById('locationDetail').innerText = name;
+                    document.getElementById('locationSub').innerText = admin1 || "Hasil Pencarian";
+                    
+                    fetchWeather(latitude, longitude, false); // False = jangan overwrite nama dengan reverse geo
                 } else {
-                    alert("Kota tidak ditemukan!");
+                    alert("Lokasi tidak ditemukan.");
                 }
-            } catch (err) {
-                alert("Terjadi kesalahan saat mencari kota.");
-            } finally {
-                btn.innerHTML = originalIcon;
+            } catch (e) {
+                alert("Error pencarian.");
             }
         }
 
-        // --- Event Listener: Enter di Search Bar ---
-        document.getElementById('searchInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                handleSearch();
-            }
+        // Listeners
+        document.getElementById('searchInput').addEventListener('keypress', (e) => e.key === 'Enter' && handleSearch());
+        
+        map.on('click', (e) => {
+            fetchWeather(e.latlng.lat, e.latlng.lng, true);
         });
 
-        // --- Event Listener: Klik di Peta ---
-        map.on('click', function(e) {
-            const { lat, lng } = e.latlng;
-            // Kita gunakan koordinat presisi, nama kota diset generic karena butuh Reverse Geocoding yang kompleks untuk nama akurat tanpa API Key
-            fetchWeather(lat, lng, `Lokasi: ${lat.toFixed(2)}, ${lng.toFixed(2)}`);
+        // Init: Coba load lokasi user, jika gagal load Jakarta default
+        document.addEventListener("DOMContentLoaded", () => {
+             // Opsional: Langsung tanya lokasi saat web dibuka
+             // getMyLocation(); 
+             
+             // Atau load default dulu agar tidak kosong
+             fetchWeather(-6.1754, 106.8272, true); 
         });
-
-        // --- Load Default (Jakarta) Saat Pertama Buka ---
-        fetchWeather(-6.2088, 106.8456, "Jakarta");
 
     </script>
 </body>
