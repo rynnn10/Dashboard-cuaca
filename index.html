@@ -2,260 +2,431 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuaca Kalender & Smart Search</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cuaca Pro - Riyan 2025</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background: #0f172a; /* Slate 900 */
-            background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0b1121;
+            /* Background gradasi halus */
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 100%, hsla(225,39%,20%,1) 0, transparent 50%);
             min-height: 100vh;
-            color: white;
+            color: #e2e8f0;
+            overflow-x: hidden;
         }
 
+        /* Glassmorphism Panel */
         .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 1rem;
         }
 
-        /* Calendar Grid Styles */
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 1px;
-            background: rgba(255,255,255,0.1); /* Lines between cells */
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 0.5rem;
-            overflow: hidden;
+        /* Map Fullscreen Toggle Logic */
+        #mapContainer.fullscreen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            height: 100vh !important;
+            border-radius: 0;
+            padding: 0;
+            margin: 0;
+            background: #000;
         }
         
-        .calendar-cell {
-            background: rgba(30, 41, 59, 0.9); /* Cell color */
-            min-height: 100px;
-            padding: 0.5rem;
-            display: flex;
-            flex-col: column;
-            flex-direction: column;
-            align-items: center;
-            justify-content: start;
-            transition: all 0.2s;
+        #mapContainer.fullscreen #map {
+            border-radius: 0;
         }
 
-        .calendar-cell:hover {
-            background: rgba(51, 65, 85, 0.9);
+        /* Calendar Responsive Scroll */
+        .calendar-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 10px;
         }
 
-        .calendar-cell.today {
-            background: rgba(59, 130, 246, 0.2); /* Blue tint */
-            border: 1px solid rgba(59, 130, 246, 0.5);
-        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
 
-        .calendar-cell.empty {
-            background: rgba(15, 23, 42, 0.5);
+        /* Animations */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .animate-pulse-slow { animation: pulse-slow 3s infinite; }
     </style>
 </head>
-<body class="p-4 md:p-6 text-slate-200">
+<body class="p-3 md:p-6 pb-10">
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="max-w-7xl mx-auto space-y-4 md:space-y-6">
         
-        <!-- Header & Smart Search -->
-        <div class="flex flex-col lg:flex-row justify-between items-center gap-4 glass p-4 z-50 relative">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <i class="fa-solid fa-calendar-days text-white"></i>
+        <!-- HEADER MOBILE RESPONSIVE -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass p-4 md:p-5 relative z-50">
+            <!-- Brand -->
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 shrink-0">
+                    <i class="fa-solid fa-bolt text-white text-lg"></i>
                 </div>
-                <div>
-                    <h1 class="font-bold text-xl text-white">WeatherCal</h1>
-                    <p class="text-xs text-gray-400">Prakiraan Jangka Panjang</p>
+                <div class="leading-tight">
+                    <h1 class="font-bold text-lg md:text-xl text-white tracking-tight">WeatherPro</h1>
+                    <p class="text-[10px] md:text-xs text-blue-300 font-mono">LIVE SATELLITE DATA</p>
                 </div>
+                
+                <!-- Tombol Lokasi Saya (Mobile Only - Small Icon) -->
+                <button onclick="getMyLocation()" class="md:hidden ml-auto bg-slate-700/50 p-2 rounded-lg text-blue-400 border border-slate-600">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </button>
             </div>
 
-            <div class="flex gap-2 w-full lg:w-auto relative z-50">
-                <button onclick="getMyLocation()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition text-sm font-medium whitespace-nowrap">
-                    <i class="fa-solid fa-location-crosshairs mr-1"></i> Lokasi Saya
+            <!-- Search Bar & Desktop Location Button -->
+            <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto relative">
+                <button onclick="getMyLocation()" class="hidden md:flex bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg transition text-sm font-semibold shadow-lg shadow-blue-900/50 items-center gap-2">
+                    <i class="fa-solid fa-location-crosshairs"></i> Lokasi Saya
                 </button>
 
-                <div class="relative w-full lg:w-96 group">
-                    <input type="text" id="searchInput" placeholder="Ketik nama desa/kota..." autocomplete="off"
-                        class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 text-white placeholder-slate-500 transition-colors">
-                    <i class="fa-solid fa-search absolute right-3 top-3 text-slate-500"></i>
+                <div class="relative w-full md:w-80 group">
+                    <input type="text" id="searchInput" placeholder="Cari desa, jalan, kota..." autocomplete="off"
+                        class="w-full bg-slate-900/80 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-white placeholder-slate-500 transition-all">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500"></i>
                     
-                    <!-- Search Dropdown Results -->
-                    <div id="searchResults" class="hidden absolute top-full left-0 w-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-hidden z-[100] max-h-60 overflow-y-auto">
-                        <!-- Items injected by JS -->
-                    </div>
+                    <!-- Dropdown Hasil Pencarian -->
+                    <div id="searchResults" class="hidden absolute top-full left-0 w-full mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[100] max-h-60 overflow-y-auto"></div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- MAIN GRID LAYOUT -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
             
-            <!-- Left Panel: Current Weather & Map -->
-            <div class="lg:col-span-1 space-y-6">
-                <!-- Current Weather Card -->
-                <div class="glass p-6 text-center relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+            <!-- LEFT PANEL: INFO CUACA UTAMA -->
+            <div class="lg:col-span-4 space-y-4 md:space-y-6">
+                <!-- Main Card -->
+                <div class="glass p-5 md:p-8 relative overflow-hidden group">
+                    <!-- Decor Blobs -->
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-500 rounded-full blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
                     
-                    <h2 id="locName" class="text-2xl font-bold text-white mb-1">Jakarta</h2>
-                    <p id="locSub" class="text-sm text-gray-400 mb-6">Indonesia</p>
+                    <div class="relative z-10">
+                        <div class="flex items-start gap-2 mb-6">
+                            <i class="fa-solid fa-location-dot text-red-500 mt-1 animate-bounce"></i>
+                            <div>
+                                <h2 id="locName" class="text-xl md:text-2xl font-bold text-white leading-tight">Mendeteksi Lokasi...</h2>
+                                <p id="locSub" class="text-xs md:text-sm text-gray-400 mt-1 border-l-2 border-blue-500/50 pl-2">Mohon izinkan akses GPS</p>
+                            </div>
+                        </div>
 
-                    <div class="flex justify-center items-center gap-4 mb-6">
-                        <i id="mainIcon" class="fa-solid fa-cloud text-6xl text-blue-400"></i>
-                        <div class="text-left">
-                            <span id="mainTemp" class="text-5xl font-bold text-white block">30°</span>
-                            <span id="mainDesc" class="text-blue-300 font-medium">Berawan</span>
+                        <div class="flex flex-col items-center justify-center py-4">
+                            <i id="mainIcon" class="fa-solid fa-circle-notch fa-spin text-5xl md:text-7xl text-gray-500 mb-4 transition-all duration-500"></i>
+                            <div class="text-center">
+                                <span id="mainTemp" class="text-6xl md:text-7xl font-bold text-white tracking-tighter block">-°</span>
+                                <span id="mainDesc" class="text-blue-300 text-lg md:text-xl font-medium">Menunggu data...</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="grid grid-cols-3 gap-2 text-sm">
-                        <div class="bg-slate-800/50 p-2 rounded">
-                            <i class="fa-solid fa-wind text-gray-400 mb-1"></i>
-                            <div id="wind" class="font-bold">0 km/h</div>
-                        </div>
-                        <div class="bg-slate-800/50 p-2 rounded">
-                            <i class="fa-solid fa-droplet text-blue-400 mb-1"></i>
-                            <div id="humid" class="font-bold">0%</div>
-                        </div>
-                        <div class="bg-slate-800/50 p-2 rounded">
-                            <i class="fa-solid fa-eye text-green-400 mb-1"></i>
-                            <div id="vis" class="font-bold">0 km</div>
+                        <!-- Detail Grid (Wind, Humid, etc) -->
+                        <div class="grid grid-cols-3 gap-2 mt-6">
+                            <div class="bg-slate-900/40 p-3 rounded-xl text-center backdrop-blur-sm border border-white/5">
+                                <i class="fa-solid fa-wind text-gray-400 text-xs mb-1 block"></i>
+                                <span id="wind" class="font-bold text-sm text-white">-</span>
+                            </div>
+                            <div class="bg-slate-900/40 p-3 rounded-xl text-center backdrop-blur-sm border border-white/5">
+                                <i class="fa-solid fa-droplet text-blue-400 text-xs mb-1 block"></i>
+                                <span id="humid" class="font-bold text-sm text-white">-</span>
+                            </div>
+                            <div class="bg-slate-900/40 p-3 rounded-xl text-center backdrop-blur-sm border border-white/5">
+                                <i class="fa-solid fa-eye text-green-400 text-xs mb-1 block"></i>
+                                <span id="vis" class="font-bold text-sm text-white">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Map -->
-                <div class="glass p-1 h-64 rounded-xl relative z-0">
-                    <div id="map" class="w-full h-full rounded-lg"></div>
+                <!-- MAP CONTAINER (Resizable) -->
+                <div id="mapContainer" class="glass p-1 h-64 md:h-80 relative transition-all duration-300 group">
+                    <div id="map" class="w-full h-full rounded-lg z-0"></div>
+                    
+                    <!-- Resize Button Overlay -->
+                    <button onclick="toggleMapSize()" class="absolute top-3 right-3 z-[400] bg-black/70 hover:bg-black/90 text-white w-9 h-9 rounded-lg flex items-center justify-center border border-white/20 backdrop-blur-sm transition shadow-lg" title="Perbesar Peta">
+                        <i id="resizeIcon" class="fa-solid fa-expand text-sm"></i>
+                    </button>
+
+                    <!-- Info Overlay -->
+                    <div class="absolute bottom-3 left-3 z-[400] bg-black/60 px-3 py-1 rounded text-[10px] text-white backdrop-blur pointer-events-none border border-white/10">
+                        <i class="fa-solid fa-info-circle mr-1"></i> Klik peta untuk pindah
+                    </div>
                 </div>
             </div>
 
-            <!-- Right Panel: Calendar View -->
-            <div class="lg:col-span-2 glass p-6">
-                <div class="flex justify-between items-end mb-4">
+            <!-- RIGHT PANEL: CALENDAR -->
+            <div class="lg:col-span-8 glass p-4 md:p-6 flex flex-col h-full">
+                <div class="flex justify-between items-end mb-4 md:mb-6 border-b border-white/5 pb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-white" id="calendarTitle">November 2025</h3>
-                        <p class="text-xs text-gray-400">Menampilkan data hingga 16 hari ke depan (Batas akurasi meteorologi).</p>
+                        <h3 id="calendarTitle" class="text-lg md:text-xl font-bold text-white">Prakiraan Bulanan</h3>
+                        <p class="text-xs text-gray-400 mt-1">Menggunakan model prediksi ECMWF (Eropa) & GFS (Global)</p>
                     </div>
-                    <div class="flex gap-2">
-                        <!-- Legend -->
-                        <div class="flex items-center gap-1 text-xs text-gray-400"><span class="w-2 h-2 rounded-full bg-blue-500/50 border border-blue-500"></span> Hari Ini</div>
+                    <div class="hidden md:block text-right">
+                        <div class="text-xs text-gray-500 uppercase tracking-widest font-bold">Hari Ini</div>
+                        <div id="currentDateStr" class="text-sm font-semibold text-blue-400">Loading...</div>
                     </div>
                 </div>
 
-                <!-- Days Header -->
-                <div class="grid grid-cols-7 gap-1 mb-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <div>Min</div><div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div>
-                </div>
+                <!-- Scrollable Calendar Wrapper for Mobile -->
+                <div class="calendar-wrapper flex-grow">
+                    <!-- Header Hari (Sen, Sel, Rab...) -->
+                    <div class="grid grid-cols-7 gap-1 md:gap-2 min-w-[600px] md:min-w-0 mb-2">
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">MINGGU</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">SENIN</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">SELASA</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">RABU</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">KAMIS</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">JUMAT</div>
+                        <div class="text-center text-xs font-bold text-gray-500 py-2">SABTU</div>
+                    </div>
 
-                <!-- Calendar Grid Container -->
-                <div id="calendarGrid" class="calendar-grid">
-                    <!-- Calendar Cells Injected Here -->
-                    <div class="p-10 text-center col-span-7 text-gray-500">Memuat Kalender...</div>
+                    <!-- Calendar Grid Body -->
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-1 bg-slate-700/30 border border-slate-700 rounded-lg overflow-hidden min-w-[600px] md:min-w-0">
+                        <!-- Cells will be injected here -->
+                    </div>
                 </div>
             </div>
-
         </div>
 
-        <footer class="text-center text-xs text-gray-600 py-4">
-            Data Source: Open-Meteo (Global High-Resolution Models). Map: OpenStreetMap.
+        <!-- Footer -->
+        <footer class="text-center py-6 border-t border-white/5 mt-8">
+            <p class="text-sm text-gray-500 font-medium">&copy; Riyan 2025. All Rights Reserved.</p>
+            <p class="text-[10px] text-gray-600 mt-1">Data provided by Open-Meteo & OpenStreetMap Contributors</p>
         </footer>
+
     </div>
 
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <script>
-        // --- CONFIG & STATE ---
+        // --- VARIABLES ---
         let map, marker;
         let searchTimeout;
-        const currentMonth = new Date().getMonth(); 
         const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        let isMapFullscreen = false;
 
-        // --- 1. INITIALIZE MAP ---
+        // --- 1. INIT MAP ---
         function initMap() {
-            map = L.map('map', { zoomControl: false }).setView([-6.2088, 106.8456], 11);
+            // Default: Jakarta Center
+            map = L.map('map', { zoomControl: false }).setView([-6.200, 106.816], 13);
+            
+            // Menggunakan Tile Layer "Dark Matter" agar cocok dengan tema
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OSM &copy; CARTO',
+                attribution: '&copy; CARTO',
                 maxZoom: 19
             }).addTo(map);
-            marker = L.marker([-6.2088, 106.8456]).addTo(map);
-            
-            // Map click
+
+            marker = L.marker([-6.200, 106.816]).addTo(map);
+
+            // Add Zoom Control di pojok bawah
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // Event: Klik Peta
             map.on('click', (e) => {
-                getWeather(e.latlng.lat, e.latlng.lng, "Lokasi Peta", true);
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                fetchWeather(lat, lng, true); // true = auto cari nama tempat
             });
         }
 
-        // --- 2. WEATHER FETCHING (16 Days Forecast) ---
-        async function getWeather(lat, lon, nameOverride = null, autoReverseGeo = false) {
-            // Update Loading State
-            document.getElementById('calendarGrid').innerHTML = `<div class="p-20 col-span-7 text-center text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Sinkronisasi Satelit...</div>`;
+        // --- 2. MAP RESIZE LOGIC ---
+        function toggleMapSize() {
+            const container = document.getElementById('mapContainer');
+            const icon = document.getElementById('resizeIcon');
+            
+            isMapFullscreen = !isMapFullscreen;
 
-            // Map Update
-            map.setView([lat, lon], 12);
+            if (isMapFullscreen) {
+                container.classList.add('fullscreen');
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                // Pindah tombol agar mudah dijangkau di mode fullscreen
+                icon.parentElement.classList.add('top-6', 'right-6', 'w-12', 'h-12');
+                icon.parentElement.classList.remove('top-3', 'right-3', 'w-9', 'h-9');
+            } else {
+                container.classList.remove('fullscreen');
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                // Reset tombol
+                icon.parentElement.classList.remove('top-6', 'right-6', 'w-12', 'h-12');
+                icon.parentElement.classList.add('top-3', 'right-3', 'w-9', 'h-9');
+            }
+            
+            // Wajib panggil ini agar Leaflet merender ulang ukuran tile
+            setTimeout(() => { map.invalidateSize(); }, 300);
+        }
+
+        // --- 3. REVERSE GEOCODING (AKURASI TINGGI) ---
+        async function getPreciseAddress(lat, lon) {
+            // Menggunakan Nominatim dengan addressdetails=1
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const addr = data.address || {};
+
+                // Logika Prioritas Nama (Jalan -> Komplek -> Desa -> Kota)
+                const street = addr.road || addr.pedestrian || addr.path;
+                const area = addr.hamlet || addr.neighbourhood || addr.village || addr.suburb;
+                const city = addr.city || addr.town || addr.county || addr.state_district;
+                
+                let mainName = street || area || city || "Lokasi Terpilih";
+                let subName = "";
+
+                if (mainName === street) {
+                    subName = area ? `${area}, ${city}` : city;
+                } else if (mainName === area) {
+                    subName = city;
+                } else {
+                    subName = addr.state || data.display_name.split(',')[1];
+                }
+
+                return { main: mainName, sub: subName };
+
+            } catch (e) {
+                console.error(e);
+                return { main: "Koordinat Peta", sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
+            }
+        }
+
+        // --- 4. FETCH WEATHER & RENDER ---
+        async function fetchWeather(lat, lon, autoAddress = false, manualName = null) {
+            // Update UI Loading
+            document.getElementById('mainDesc').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            document.getElementById('calendarGrid').innerHTML = '<div class="col-span-7 py-20 text-center text-gray-500">Memuat data satelit...</div>';
+
+            // Update Peta
             marker.setLatLng([lat, lon]);
+            if (!isMapFullscreen) map.setView([lat, lon], 14);
 
-            // Handle Nama Lokasi
-            if(autoReverseGeo) {
-                // Fetch reverse geo
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                    const data = await res.json();
-                    const addr = data.address;
-                    const main = addr.village || addr.suburb || addr.city || "Lokasi Terpilih";
-                    const sub = addr.county || addr.state || data.name;
-                    updateLocationUI(main, sub);
-                } catch(e) { updateLocationUI("Lokasi Peta", `${lat.toFixed(2)}, ${lon.toFixed(2)}`); }
-            } else if (nameOverride) {
-                updateLocationUI(nameOverride.split(',')[0], nameOverride);
+            // Update Nama Lokasi
+            if (manualName) {
+                const parts = manualName.split(',');
+                document.getElementById('locName').innerText = parts[0];
+                document.getElementById('locSub').innerText = parts.slice(1).join(', ').trim();
+            } else if (autoAddress) {
+                document.getElementById('locName').innerText = "Melacak...";
+                const addr = await getPreciseAddress(lat, lon);
+                document.getElementById('locName').innerText = addr.main;
+                document.getElementById('locSub').innerText = addr.sub;
             }
 
-            // Fetch Weather (16 Hari)
             try {
+                // Fetch API (16 Hari)
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=16`;
                 const res = await fetch(url);
                 const data = await res.json();
 
-                updateCurrentUI(data.current);
+                // Update Current
+                renderCurrent(data.current);
+                
+                // Update Calendar
                 renderCalendar(data.daily);
 
-            } catch (err) {
-                console.error(err);
+            } catch (e) {
                 alert("Gagal mengambil data cuaca.");
             }
         }
 
-        // --- 3. UI UPDATERS ---
-        function updateLocationUI(main, sub) {
-            document.getElementById('locName').innerText = main;
-            document.getElementById('locSub').innerText = sub;
-        }
-
-        function updateCurrentUI(current) {
-            const info = getWeatherInfo(current.weather_code);
-            document.getElementById('mainTemp').innerText = Math.round(current.temperature_2m) + "°";
+        function renderCurrent(curr) {
+            const info = getWeatherInfo(curr.weather_code);
+            document.getElementById('mainTemp').innerText = Math.round(curr.temperature_2m) + "°";
             document.getElementById('mainDesc').innerText = info.desc;
-            document.getElementById('mainIcon').className = `fa-solid ${info.icon} text-6xl mb-4 ${info.color}`;
+            document.getElementById('mainIcon').className = `fa-solid ${info.icon} text-5xl md:text-7xl mb-4 ${info.color}`;
             
-            document.getElementById('wind').innerText = current.wind_speed_10m + " km/h";
-            document.getElementById('humid').innerText = current.relative_humidity_2m + "%";
-            document.getElementById('vis').innerText = (current.visibility/1000).toFixed(1) + " km";
+            document.getElementById('wind').innerText = curr.wind_speed_10m + " km/h";
+            document.getElementById('humid').innerText = curr.relative_humidity_2m + "%";
+            document.getElementById('vis').innerText = (curr.visibility / 1000).toFixed(1) + " km";
+
+            // Update Date Header
+            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            document.getElementById('currentDateStr').innerText = new Date().toLocaleDateString('id-ID', options);
         }
 
+        function renderCalendar(daily) {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = "";
+
+            // Mapping Data Cuaca ke Tanggal YYYY-MM-DD
+            const weatherMap = {};
+            daily.time.forEach((t, i) => {
+                weatherMap[t] = {
+                    code: daily.weather_code[i],
+                    max: Math.round(daily.temperature_2m_max[i]),
+                    min: Math.round(daily.temperature_2m_min[i])
+                };
+            });
+
+            // Logika Kalender Bulan Ini
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Minggu
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Render Kotak Kosong (Sebelum tanggal 1)
+            for(let i=0; i < firstDayIndex; i++) {
+                grid.innerHTML += `<div class="bg-slate-800/50 min-h-[80px] md:min-h-[100px]"></div>`;
+            }
+
+            // Render Tanggal 1 - 30/31
+            for(let d=1; d <= daysInMonth; d++) {
+                const monthStr = (currentMonth + 1).toString().padStart(2, '0');
+                const dayStr = d.toString().padStart(2, '0');
+                const dateKey = `${currentYear}-${monthStr}-${dayStr}`;
+                
+                const weather = weatherMap[dateKey];
+                const isToday = dateKey === todayStr;
+
+                let content = `
+                    <div class="h-full flex flex-col justify-between p-1 md:p-2 transition hover:bg-white/5 ${isToday ? 'bg-blue-600/10 shadow-[inset_0_0_0_2px_#3b82f6]' : 'bg-slate-800/80'}">
+                        <span class="text-xs font-bold ${isToday ? 'text-blue-400' : 'text-gray-500'}">${d}</span>
+                `;
+
+                if (weather) {
+                    const info = getWeatherInfo(weather.code);
+                    content += `
+                        <div class="flex flex-col items-center justify-center flex-grow py-2">
+                            <i class="fa-solid ${info.icon} text-lg md:text-2xl mb-1 ${info.color}"></i>
+                            <span class="text-[10px] text-gray-400 text-center leading-tight hidden md:block">${info.desc}</span>
+                        </div>
+                        <div class="text-[10px] md:text-xs font-bold text-center text-white">
+                            ${weather.max}° <span class="text-gray-500 font-normal">/ ${weather.min}°</span>
+                        </div>
+                    `;
+                } else {
+                    content += `<div class="flex-grow flex items-center justify-center text-gray-700 text-xs">-</div>`;
+                }
+
+                content += `</div>`;
+                
+                // Bungkus dalam div container agar border grid rapi
+                const cell = document.createElement('div');
+                cell.className = "min-h-[100px]"; // Tinggi fixed agar rapi di mobile
+                cell.innerHTML = content;
+                grid.appendChild(cell);
+            }
+        }
+
+        // --- 5. HELPERS & SEARCH ---
         function getWeatherInfo(code) {
-            const codes = {
+            const map = {
                 0: { desc: "Cerah", icon: "fa-sun", color: "text-yellow-400" },
                 1: { desc: "Cerah Berawan", icon: "fa-cloud-sun", color: "text-yellow-300" },
                 2: { desc: "Berawan", icon: "fa-cloud", color: "text-gray-400" },
@@ -266,165 +437,73 @@
                 80: { desc: "Hujan Lokal", icon: "fa-cloud-sun-rain", color: "text-indigo-400" },
                 95: { desc: "Petir", icon: "fa-bolt", color: "text-yellow-500" }
             };
-            return codes[code] || { desc: "-", icon: "fa-minus", color: "text-gray-500" };
+            return map[code] || { desc: "-", icon: "fa-minus", color: "text-gray-600" };
         }
 
-        // --- 4. CALENDAR LOGIC (THE COMPLEX PART) ---
-        function renderCalendar(dailyData) {
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = "";
+        // Search Autocomplete Logic
+        const searchInp = document.getElementById('searchInput');
+        const searchRes = document.getElementById('searchResults');
 
-            // Update Title
-            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-            document.getElementById('calendarTitle').innerText = `${monthNames[currentMonth]} ${currentYear}`;
-
-            // Helper: Create Map of "YYYY-MM-DD" -> Weather Data
-            const weatherMap = {};
-            if(dailyData) {
-                dailyData.time.forEach((dateStr, index) => {
-                    weatherMap[dateStr] = {
-                        code: dailyData.weather_code[index],
-                        max: Math.round(dailyData.temperature_2m_max[index]),
-                        min: Math.round(dailyData.temperature_2m_min[index])
-                    };
-                });
-            }
-
-            // Logic Kalender
-            const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Sun
-            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            // 1. Empty Cells for days before 1st of month
-            for (let i = 0; i < firstDayOfMonth; i++) {
-                const cell = document.createElement('div');
-                cell.className = "calendar-cell empty";
-                grid.appendChild(cell);
-            }
-
-            // 2. Days of Month
-            for (let day = 1; day <= daysInMonth; day++) {
-                // Construct Date String YYYY-MM-DD manually to avoid timezone issues
-                const monthStr = (currentMonth + 1).toString().padStart(2, '0');
-                const dayStr = day.toString().padStart(2, '0');
-                const dateKey = `${currentYear}-${monthStr}-${dayStr}`;
-                
-                const weather = weatherMap[dateKey];
-                const isToday = dateKey === todayStr;
-
-                const cell = document.createElement('div');
-                cell.className = `calendar-cell ${isToday ? 'today' : ''}`;
-
-                let contentHtml = `<span class="text-xs font-bold w-full text-left ${isToday ? 'text-blue-400' : 'text-gray-500'}">${day}</span>`;
-
-                if (weather) {
-                    const info = getWeatherInfo(weather.code);
-                    contentHtml += `
-                        <div class="flex-1 flex flex-col justify-center items-center mt-1 w-full animate-fade-in">
-                            <i class="fa-solid ${info.icon} text-xl mb-1 ${info.color}"></i>
-                            <span class="text-[10px] text-gray-400 truncate w-full text-center">${info.desc}</span>
-                            <div class="text-xs font-bold mt-1">
-                                ${weather.max}° <span class="text-gray-600 font-normal">/ ${weather.min}°</span>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    // No data (past or too far future)
-                    contentHtml += `
-                        <div class="flex-1 flex justify-center items-center text-gray-700 text-xs mt-2">
-                           -
-                        </div>
-                    `;
-                }
-
-                cell.innerHTML = contentHtml;
-                grid.appendChild(cell);
-            }
-        }
-
-        // --- 5. SMART SEARCH (DROPDOWN) ---
-        const searchInput = document.getElementById('searchInput');
-        const searchResults = document.getElementById('searchResults');
-
-        searchInput.addEventListener('input', (e) => {
+        searchInp.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
-            const query = e.target.value.trim();
+            const val = e.target.value;
+            if(val.length < 3) { searchRes.classList.add('hidden'); return; }
             
-            if (query.length < 3) {
-                searchResults.classList.add('hidden');
-                return;
-            }
-
-            searchTimeout = setTimeout(() => performSearch(query), 500); // Debounce
-        });
-
-        async function performSearch(query) {
-            searchResults.classList.remove('hidden');
-            searchResults.innerHTML = '<div class="p-3 text-xs text-gray-400">Mencari...</div>';
-
-            try {
-                // Open-Meteo Geocoding
-                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=5&language=id&format=json`);
-                const data = await res.json();
-
-                searchResults.innerHTML = '';
-
-                if (!data.results || data.results.length === 0) {
-                    searchResults.innerHTML = '<div class="p-3 text-xs text-gray-400">Lokasi tidak ditemukan</div>';
-                    return;
-                }
-
-                // Render List Items
-                data.results.forEach(place => {
-                    const div = document.createElement('div');
-                    div.className = "px-4 py-3 hover:bg-slate-700 cursor-pointer border-b border-slate-700 last:border-0 transition flex justify-between items-center group";
+            searchTimeout = setTimeout(async () => {
+                searchRes.classList.remove('hidden');
+                searchRes.innerHTML = '<div class="p-4 text-xs text-gray-400">Mencari...</div>';
+                
+                try {
+                    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${val}&count=5&language=id&format=json`);
+                    const d = await r.json();
                     
-                    const country = place.country_code ? place.country_code.toUpperCase() : '';
-                    const admin = place.admin1 || place.admin2 || '';
-                    const fullLabel = `${place.name}, ${admin} ${country}`;
-
-                    div.innerHTML = `
-                        <div>
-                            <div class="text-sm text-white font-medium group-hover:text-blue-400">${place.name}</div>
-                            <div class="text-xs text-gray-400">${admin}, ${country}</div>
-                        </div>
-                        <i class="fa-solid fa-chevron-right text-xs text-gray-600 group-hover:text-white"></i>
-                    `;
-
-                    div.onclick = () => {
-                        getWeather(place.latitude, place.longitude, fullLabel);
-                        searchInput.value = place.name;
-                        searchResults.classList.add('hidden');
-                    };
-
-                    searchResults.appendChild(div);
-                });
-
-            } catch (err) {
-                searchResults.innerHTML = '<div class="p-3 text-xs text-red-400">Error koneksi</div>';
-            }
-        }
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-                searchResults.classList.add('hidden');
-            }
+                    searchRes.innerHTML = '';
+                    if(!d.results) { searchRes.innerHTML = '<div class="p-4 text-xs text-red-400">Tidak ditemukan</div>'; return; }
+                    
+                    d.results.forEach(loc => {
+                        const div = document.createElement('div');
+                        div.className = "px-4 py-3 hover:bg-slate-700 cursor-pointer border-b border-slate-700/50 flex flex-col";
+                        div.innerHTML = `
+                            <span class="text-sm font-bold text-white">${loc.name}</span>
+                            <span class="text-xs text-gray-400">${loc.admin1 || ''}, ${loc.country || ''}</span>
+                        `;
+                        div.onclick = () => {
+                            fetchWeather(loc.latitude, loc.longitude, false, `${loc.name}, ${loc.admin1||''}`);
+                            searchRes.classList.add('hidden');
+                            searchInp.value = loc.name;
+                        };
+                        searchRes.appendChild(div);
+                    });
+                } catch(e) { searchRes.innerHTML = '<div class="p-4 text-xs text-red-400">Error</div>'; }
+            }, 500);
         });
 
-        // --- 6. GEOLOCATION ---
+        // Close search on outside click
+        document.addEventListener('click', (e) => {
+            if (!searchInp.contains(e.target) && !searchRes.contains(e.target)) searchRes.classList.add('hidden');
+        });
+
+        // Geolocation
         function getMyLocation() {
-            if(!navigator.geolocation) return alert("Geolocation tidak didukung");
+            if (!navigator.geolocation) return alert("Browser tidak mendukung GPS.");
+            
+            // Ubah tombol jadi loading
+            const btnText = document.querySelector('button[onclick="getMyLocation()"]');
             
             navigator.geolocation.getCurrentPosition(
-                (pos) => getWeather(pos.coords.latitude, pos.coords.longitude, null, true),
-                () => alert("Izin lokasi ditolak")
+                (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude, true),
+                (err) => alert("Gagal mendeteksi lokasi. Pastikan GPS aktif."),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
-        // INIT
+        // Jalankan
         initMap();
-        getWeather(-6.2088, 106.8456, "Jakarta, Indonesia"); // Default load
+        fetchWeather(-6.200, 106.816, true); // Load Jakarta Start
+
+        // Set Bulan Kalender Title
+        const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        document.getElementById('calendarTitle').innerHTML = `Cuaca ${monthNames[currentMonth]} ${currentYear}`;
 
     </script>
 </body>
