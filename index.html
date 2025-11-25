@@ -3,357 +3,428 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuaca Presisi & Lokasi Saya</title>
+    <title>Cuaca Kalender & Smart Search</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
-    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
-            font-family: 'Quicksand', sans-serif;
-            background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
+            font-family: 'Inter', sans-serif;
+            background: #0f172a; /* Slate 900 */
+            background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
             min-height: 100vh;
             color: white;
         }
 
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.5rem;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
         }
 
-        .loader {
-            border: 3px solid rgba(255,255,255,0.1);
-            border-radius: 50%;
-            border-top: 3px solid #fbbf24;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
+        /* Calendar Grid Styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: rgba(255,255,255,0.1); /* Lines between cells */
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.5rem;
+            overflow: hidden;
         }
         
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Custom Popup Map Style */
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background: rgba(30, 30, 30, 0.9);
-            color: white;
-            backdrop-filter: blur(5px);
+        .calendar-cell {
+            background: rgba(30, 41, 59, 0.9); /* Cell color */
+            min-height: 100px;
+            padding: 0.5rem;
+            display: flex;
+            flex-col: column;
+            flex-direction: column;
+            align-items: center;
+            justify-content: start;
+            transition: all 0.2s;
         }
+
+        .calendar-cell:hover {
+            background: rgba(51, 65, 85, 0.9);
+        }
+
+        .calendar-cell.today {
+            background: rgba(59, 130, 246, 0.2); /* Blue tint */
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+
+        .calendar-cell.empty {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
     </style>
 </head>
-<body class="p-4 flex flex-col items-center justify-center min-h-screen">
+<body class="p-4 md:p-6 text-slate-200">
 
-    <div class="w-full max-w-6xl space-y-6">
+    <div class="max-w-7xl mx-auto space-y-6">
         
-        <!-- Top Bar: Search & My Location -->
-        <div class="flex flex-col md:flex-row gap-4 justify-between items-center glass-panel p-4">
+        <!-- Header & Smart Search -->
+        <div class="flex flex-col lg:flex-row justify-between items-center gap-4 glass p-4 z-50 relative">
             <div class="flex items-center gap-3">
-                <div class="bg-gradient-to-tr from-yellow-400 to-orange-500 p-2 rounded-lg text-white shadow-lg shadow-orange-500/20">
-                    <i class="fa-solid fa-map-location-dot text-xl"></i>
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-calendar-days text-white"></i>
                 </div>
-                <h1 class="text-xl font-bold tracking-wide">GeoWeather <span class="text-yellow-400 font-light">Precision</span></h1>
+                <div>
+                    <h1 class="font-bold text-xl text-white">WeatherCal</h1>
+                    <p class="text-xs text-gray-400">Prakiraan Jangka Panjang</p>
+                </div>
             </div>
 
-            <div class="flex w-full md:w-auto gap-2">
-                <button onclick="getMyLocation()" id="btnLoc" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full transition flex items-center gap-2 shadow-lg shadow-blue-500/30 whitespace-nowrap">
-                    <i class="fa-solid fa-crosshairs"></i> <span class="hidden sm:inline">Lokasi Saya</span>
+            <div class="flex gap-2 w-full lg:w-auto relative z-50">
+                <button onclick="getMyLocation()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition text-sm font-medium whitespace-nowrap">
+                    <i class="fa-solid fa-location-crosshairs mr-1"></i> Lokasi Saya
                 </button>
-                
-                <div class="relative w-full md:w-80">
-                    <input type="text" id="searchInput" placeholder="Cari Desa/Kecamatan..." 
-                        class="w-full bg-white/10 border border-white/20 rounded-full px-5 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm placeholder-gray-400 transition-all">
-                    <button onclick="handleSearch()" class="absolute right-1 top-1 bg-white/10 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition">
-                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
-                    </button>
+
+                <div class="relative w-full lg:w-96 group">
+                    <input type="text" id="searchInput" placeholder="Ketik nama desa/kota..." autocomplete="off"
+                        class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 text-white placeholder-slate-500 transition-colors">
+                    <i class="fa-solid fa-search absolute right-3 top-3 text-slate-500"></i>
+                    
+                    <!-- Search Dropdown Results -->
+                    <div id="searchResults" class="hidden absolute top-full left-0 w-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-hidden z-[100] max-h-60 overflow-y-auto">
+                        <!-- Items injected by JS -->
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- Main Weather Card -->
-            <div class="lg:col-span-4 glass-panel p-8 flex flex-col justify-between relative overflow-hidden min-h-[450px]">
-                <!-- Background Blob -->
-                <div class="absolute -top-20 -left-20 w-64 h-64 bg-blue-500 rounded-full blur-[100px] opacity-20"></div>
-                <div class="absolute bottom-0 right-0 w-40 h-40 bg-yellow-500 rounded-full blur-[80px] opacity-10"></div>
+            <!-- Left Panel: Current Weather & Map -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Current Weather Card -->
+                <div class="glass p-6 text-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+                    
+                    <h2 id="locName" class="text-2xl font-bold text-white mb-1">Jakarta</h2>
+                    <p id="locSub" class="text-sm text-gray-400 mb-6">Indonesia</p>
 
-                <div class="relative z-10">
-                    <div class="flex items-start gap-2 mb-1">
-                        <i class="fa-solid fa-location-dot text-red-400 mt-1 animate-bounce"></i>
-                        <div>
-                            <!-- Lokasi Lebih Spesifik -->
-                            <h2 id="locationDetail" class="text-xl font-bold leading-tight">Mendeteksi lokasi...</h2>
-                            <p id="locationSub" class="text-xs text-gray-400 mt-1">Koordinat: -</p>
+                    <div class="flex justify-center items-center gap-4 mb-6">
+                        <i id="mainIcon" class="fa-solid fa-cloud text-6xl text-blue-400"></i>
+                        <div class="text-left">
+                            <span id="mainTemp" class="text-5xl font-bold text-white block">30°</span>
+                            <span id="mainDesc" class="text-blue-300 font-medium">Berawan</span>
                         </div>
                     </div>
-                    <p id="currentDate" class="text-sm text-gray-300 mt-4 border-l-2 border-yellow-400 pl-3">Selasa, 25 Nov 2025</p>
+
+                    <div class="grid grid-cols-3 gap-2 text-sm">
+                        <div class="bg-slate-800/50 p-2 rounded">
+                            <i class="fa-solid fa-wind text-gray-400 mb-1"></i>
+                            <div id="wind" class="font-bold">0 km/h</div>
+                        </div>
+                        <div class="bg-slate-800/50 p-2 rounded">
+                            <i class="fa-solid fa-droplet text-blue-400 mb-1"></i>
+                            <div id="humid" class="font-bold">0%</div>
+                        </div>
+                        <div class="bg-slate-800/50 p-2 rounded">
+                            <i class="fa-solid fa-eye text-green-400 mb-1"></i>
+                            <div id="vis" class="font-bold">0 km</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="relative z-10 flex flex-col items-center justify-center my-6">
-                    <i id="weatherIcon" class="fa-solid fa-circle-notch fa-spin text-6xl text-gray-400 mb-4"></i>
-                    <div class="text-center">
-                        <h1 id="tempMain" class="text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400">--°</h1>
-                        <p id="weatherDesc" class="text-lg font-medium text-yellow-300 mt-2">Menunggu Data</p>
-                    </div>
-                </div>
-
-                <div class="relative z-10 grid grid-cols-3 gap-2 mt-auto text-center">
-                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
-                        <i class="fa-solid fa-wind text-gray-400 text-xs"></i>
-                        <p id="windSpeed" class="font-bold text-sm mt-1">--</p>
-                    </div>
-                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
-                        <i class="fa-solid fa-droplet text-blue-400 text-xs"></i>
-                        <p id="humidity" class="font-bold text-sm mt-1">--</p>
-                    </div>
-                    <div class="bg-black/20 rounded-xl p-2 backdrop-blur-sm">
-                        <i class="fa-solid fa-eye text-green-400 text-xs"></i>
-                        <p id="visibility" class="font-bold text-sm mt-1">--</p>
-                    </div>
+                <!-- Map -->
+                <div class="glass p-1 h-64 rounded-xl relative z-0">
+                    <div id="map" class="w-full h-full rounded-lg"></div>
                 </div>
             </div>
 
-            <!-- Map Section -->
-            <div class="lg:col-span-8 glass-panel p-2 h-[400px] lg:h-auto relative group">
-                <div id="map" class="w-full h-full rounded-2xl z-0 filter brightness-90 group-hover:brightness-100 transition duration-500"></div>
-                <div class="absolute top-4 right-4 z-[500] bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg text-xs border border-white/10 shadow-xl">
-                    <i class="fa-solid fa-info-circle text-blue-400 mr-1"></i> Klik peta untuk cek cuaca desa/jalan lain
+            <!-- Right Panel: Calendar View -->
+            <div class="lg:col-span-2 glass p-6">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white" id="calendarTitle">November 2025</h3>
+                        <p class="text-xs text-gray-400">Menampilkan data hingga 16 hari ke depan (Batas akurasi meteorologi).</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <!-- Legend -->
+                        <div class="flex items-center gap-1 text-xs text-gray-400"><span class="w-2 h-2 rounded-full bg-blue-500/50 border border-blue-500"></span> Hari Ini</div>
+                    </div>
+                </div>
+
+                <!-- Days Header -->
+                <div class="grid grid-cols-7 gap-1 mb-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <div>Min</div><div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div>
+                </div>
+
+                <!-- Calendar Grid Container -->
+                <div id="calendarGrid" class="calendar-grid">
+                    <!-- Calendar Cells Injected Here -->
+                    <div class="p-10 text-center col-span-7 text-gray-500">Memuat Kalender...</div>
                 </div>
             </div>
+
         </div>
 
-        <!-- Weekly Forecast -->
-        <div class="glass-panel p-6">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                <i class="fa-regular fa-calendar-days text-yellow-400"></i> Prakiraan Mingguan
-            </h3>
-            <div id="forecastContainer" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <!-- Data injected by JS -->
-            </div>
-        </div>
-
-        <footer class="text-center text-xs text-gray-500 pb-4">
-            Data Cuaca by Open-Meteo • Peta by OpenStreetMap & Nominatim
+        <footer class="text-center text-xs text-gray-600 py-4">
+            Data Source: Open-Meteo (Global High-Resolution Models). Map: OpenStreetMap.
         </footer>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // --- Setup Map ---
-        const map = L.map('map', { zoomControl: false }).setView([-6.200, 106.816], 13);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        // --- CONFIG & STATE ---
+        let map, marker;
+        let searchTimeout;
+        const currentMonth = new Date().getMonth(); 
+        const currentYear = new Date().getFullYear();
 
-        // Tile Layer yang lebih gelap/elegan
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
-
-        let currentMarker = L.marker([-6.200, 106.816]).addTo(map);
-
-        // --- Utils: Weather Codes ---
-        function getWeatherInfo(code) {
-            const codes = {
-                0: { desc: "Cerah Total", icon: "fa-sun", color: "text-yellow-400" },
-                1: { desc: "Cerah Berawan", icon: "fa-cloud-sun", color: "text-yellow-200" },
-                2: { desc: "Berawan", icon: "fa-cloud", color: "text-gray-300" },
-                3: { desc: "Mendung Gelap", icon: "fa-cloud", color: "text-gray-500" },
-                45: { desc: "Berkabut", icon: "fa-smog", color: "text-gray-400" },
-                51: { desc: "Gerimis Halus", icon: "fa-cloud-rain", color: "text-blue-300" },
-                61: { desc: "Hujan Ringan", icon: "fa-umbrella", color: "text-blue-400" },
-                63: { desc: "Hujan Sedang", icon: "fa-cloud-showers-heavy", color: "text-blue-500" },
-                65: { desc: "Hujan Lebat", icon: "fa-cloud-showers-water", color: "text-blue-600" },
-                80: { desc: "Hujan Lokal", icon: "fa-cloud-sun-rain", color: "text-indigo-400" },
-                95: { desc: "Badai Petir", icon: "fa-bolt", color: "text-yellow-500" }
-            };
-            return codes[code] || { desc: "Tidak Diketahui", icon: "fa-meteor", color: "text-white" };
+        // --- 1. INITIALIZE MAP ---
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([-6.2088, 106.8456], 11);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OSM &copy; CARTO',
+                maxZoom: 19
+            }).addTo(map);
+            marker = L.marker([-6.2088, 106.8456]).addTo(map);
+            
+            // Map click
+            map.on('click', (e) => {
+                getWeather(e.latlng.lat, e.latlng.lng, "Lokasi Peta", true);
+            });
         }
 
-        // --- 1. Fungsi Reverse Geocoding (Cari Nama Desa/Jalan) ---
-        async function getPlaceName(lat, lon) {
-            // Menggunakan Nominatim OpenStreetMap (Gratis)
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-            
-            try {
-                const response = await fetch(url, { headers: { 'Accept-Language': 'id' } });
-                const data = await response.json();
-                
-                if (data && data.address) {
-                    // Prioritas penamaan: Desa/Kelurahan -> Kecamatan -> Kota
+        // --- 2. WEATHER FETCHING (16 Days Forecast) ---
+        async function getWeather(lat, lon, nameOverride = null, autoReverseGeo = false) {
+            // Update Loading State
+            document.getElementById('calendarGrid').innerHTML = `<div class="p-20 col-span-7 text-center text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Sinkronisasi Satelit...</div>`;
+
+            // Map Update
+            map.setView([lat, lon], 12);
+            marker.setLatLng([lat, lon]);
+
+            // Handle Nama Lokasi
+            if(autoReverseGeo) {
+                // Fetch reverse geo
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                    const data = await res.json();
                     const addr = data.address;
-                    const village = addr.village || addr.suburb || addr.hamlet || addr.neighbourhood;
-                    const road = addr.road || "";
-                    const city = addr.city || addr.town || addr.county || addr.state_district;
-                    
-                    let mainName = village ? village : (road ? road : city);
-                    let subName = city !== mainName ? city : addr.state;
-
-                    // Jika tidak ada data spesifik, gunakan display_name yang dipotong
-                    if (!mainName) mainName = data.name || "Lokasi Terpilih";
-
-                    return { main: mainName, sub: subName || data.display_name.split(',')[1] };
-                }
-                return { main: "Wilayah Tidak Bernama", sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
-            } catch (error) {
-                console.error("Geocoding error:", error);
-                return { main: "Lokasi Peta", sub: `${lat.toFixed(4)}, ${lon.toFixed(4)}` };
-            }
-        }
-
-        // --- 2. Fungsi Utama Fetch Cuaca ---
-        async function fetchWeather(lat, lon, autoName = true) {
-            // Update UI Loading
-            document.getElementById('weatherDesc').innerHTML = '<span class="text-sm italic">Mengambil data...</span>';
-            
-            // Pindahkan Peta
-            map.setView([lat, lon], 14);
-            currentMarker.setLatLng([lat, lon]);
-
-            // Ambil Nama Tempat (Jika diminta auto)
-            if (autoName) {
-                document.getElementById('locationDetail').innerText = "Melacak alamat...";
-                const place = await getPlaceName(lat, lon);
-                document.getElementById('locationDetail').innerText = place.main;
-                document.getElementById('locationSub').innerText = place.sub;
+                    const main = addr.village || addr.suburb || addr.city || "Lokasi Terpilih";
+                    const sub = addr.county || addr.state || data.name;
+                    updateLocationUI(main, sub);
+                } catch(e) { updateLocationUI("Lokasi Peta", `${lat.toFixed(2)}, ${lon.toFixed(2)}`); }
+            } else if (nameOverride) {
+                updateLocationUI(nameOverride.split(',')[0], nameOverride);
             }
 
+            // Fetch Weather (16 Hari)
             try {
-                // API Open Meteo
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=16`;
                 const res = await fetch(url);
                 const data = await res.json();
 
-                const current = data.current;
-                const info = getWeatherInfo(current.weather_code);
-
-                // Render Main Weather
-                document.getElementById('tempMain').innerText = Math.round(current.temperature_2m) + "°";
-                document.getElementById('weatherDesc').innerText = info.desc;
-                document.getElementById('windSpeed').innerText = current.wind_speed_10m + " km/h";
-                document.getElementById('humidity').innerText = current.relative_humidity_2m + "%";
-                
-                // Konversi visibilitas (meter ke km jika perlu)
-                const visKm = current.visibility ? (current.visibility / 1000).toFixed(1) + " km" : "-";
-                document.getElementById('visibility').innerText = visKm;
-
-                const iconEl = document.getElementById('weatherIcon');
-                iconEl.className = `fa-solid ${info.icon} text-6xl mb-4 ${info.color} drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] fade-in`;
-
-                document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', { 
-                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
-                });
-
-                // Render Forecast
-                const daily = data.daily;
-                const container = document.getElementById('forecastContainer');
-                container.innerHTML = "";
-
-                for(let i = 1; i <= 6; i++) {
-                    const dInfo = getWeatherInfo(daily.weather_code[i]);
-                    const dDate = new Date(daily.time[i]).toLocaleDateString('id-ID', { weekday: 'short' });
-                    
-                    const div = document.createElement('div');
-                    div.className = "bg-white/5 rounded-xl p-3 text-center border border-white/5 hover:bg-white/10 transition";
-                    div.innerHTML = `
-                        <p class="text-xs text-gray-400 mb-1">${dDate}</p>
-                        <i class="fa-solid ${dInfo.icon} text-xl my-2 ${dInfo.color}"></i>
-                        <div class="flex justify-center gap-2 text-sm font-bold">
-                            <span>${Math.round(daily.temperature_2m_max[i])}°</span>
-                            <span class="text-gray-500">${Math.round(daily.temperature_2m_min[i])}°</span>
-                        </div>
-                    `;
-                    container.appendChild(div);
-                }
+                updateCurrentUI(data.current);
+                renderCalendar(data.daily);
 
             } catch (err) {
                 console.error(err);
-                alert("Gagal memuat data cuaca.");
+                alert("Gagal mengambil data cuaca.");
             }
         }
 
-        // --- 3. Fitur Geolocation (Lokasi Saya) ---
-        function getMyLocation() {
-            const btn = document.getElementById('btnLoc');
-            const originalText = btn.innerHTML;
+        // --- 3. UI UPDATERS ---
+        function updateLocationUI(main, sub) {
+            document.getElementById('locName').innerText = main;
+            document.getElementById('locSub').innerText = sub;
+        }
+
+        function updateCurrentUI(current) {
+            const info = getWeatherInfo(current.weather_code);
+            document.getElementById('mainTemp').innerText = Math.round(current.temperature_2m) + "°";
+            document.getElementById('mainDesc').innerText = info.desc;
+            document.getElementById('mainIcon').className = `fa-solid ${info.icon} text-6xl mb-4 ${info.color}`;
             
-            if (!navigator.geolocation) {
-                alert("Browser anda tidak mendukung Geolocation.");
+            document.getElementById('wind').innerText = current.wind_speed_10m + " km/h";
+            document.getElementById('humid').innerText = current.relative_humidity_2m + "%";
+            document.getElementById('vis').innerText = (current.visibility/1000).toFixed(1) + " km";
+        }
+
+        function getWeatherInfo(code) {
+            const codes = {
+                0: { desc: "Cerah", icon: "fa-sun", color: "text-yellow-400" },
+                1: { desc: "Cerah Berawan", icon: "fa-cloud-sun", color: "text-yellow-300" },
+                2: { desc: "Berawan", icon: "fa-cloud", color: "text-gray-400" },
+                3: { desc: "Mendung", icon: "fa-cloud", color: "text-gray-500" },
+                45: { desc: "Kabut", icon: "fa-smog", color: "text-gray-400" },
+                51: { desc: "Gerimis", icon: "fa-cloud-rain", color: "text-blue-300" },
+                61: { desc: "Hujan", icon: "fa-cloud-showers-heavy", color: "text-blue-400" },
+                80: { desc: "Hujan Lokal", icon: "fa-cloud-sun-rain", color: "text-indigo-400" },
+                95: { desc: "Petir", icon: "fa-bolt", color: "text-yellow-500" }
+            };
+            return codes[code] || { desc: "-", icon: "fa-minus", color: "text-gray-500" };
+        }
+
+        // --- 4. CALENDAR LOGIC (THE COMPLEX PART) ---
+        function renderCalendar(dailyData) {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = "";
+
+            // Update Title
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            document.getElementById('calendarTitle').innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+            // Helper: Create Map of "YYYY-MM-DD" -> Weather Data
+            const weatherMap = {};
+            if(dailyData) {
+                dailyData.time.forEach((dateStr, index) => {
+                    weatherMap[dateStr] = {
+                        code: dailyData.weather_code[index],
+                        max: Math.round(dailyData.temperature_2m_max[index]),
+                        min: Math.round(dailyData.temperature_2m_min[index])
+                    };
+                });
+            }
+
+            // Logic Kalender
+            const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Sun
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // 1. Empty Cells for days before 1st of month
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                const cell = document.createElement('div');
+                cell.className = "calendar-cell empty";
+                grid.appendChild(cell);
+            }
+
+            // 2. Days of Month
+            for (let day = 1; day <= daysInMonth; day++) {
+                // Construct Date String YYYY-MM-DD manually to avoid timezone issues
+                const monthStr = (currentMonth + 1).toString().padStart(2, '0');
+                const dayStr = day.toString().padStart(2, '0');
+                const dateKey = `${currentYear}-${monthStr}-${dayStr}`;
+                
+                const weather = weatherMap[dateKey];
+                const isToday = dateKey === todayStr;
+
+                const cell = document.createElement('div');
+                cell.className = `calendar-cell ${isToday ? 'today' : ''}`;
+
+                let contentHtml = `<span class="text-xs font-bold w-full text-left ${isToday ? 'text-blue-400' : 'text-gray-500'}">${day}</span>`;
+
+                if (weather) {
+                    const info = getWeatherInfo(weather.code);
+                    contentHtml += `
+                        <div class="flex-1 flex flex-col justify-center items-center mt-1 w-full animate-fade-in">
+                            <i class="fa-solid ${info.icon} text-xl mb-1 ${info.color}"></i>
+                            <span class="text-[10px] text-gray-400 truncate w-full text-center">${info.desc}</span>
+                            <div class="text-xs font-bold mt-1">
+                                ${weather.max}° <span class="text-gray-600 font-normal">/ ${weather.min}°</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // No data (past or too far future)
+                    contentHtml += `
+                        <div class="flex-1 flex justify-center items-center text-gray-700 text-xs mt-2">
+                           -
+                        </div>
+                    `;
+                }
+
+                cell.innerHTML = contentHtml;
+                grid.appendChild(cell);
+            }
+        }
+
+        // --- 5. SMART SEARCH (DROPDOWN) ---
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 3) {
+                searchResults.classList.add('hidden');
                 return;
             }
 
-            btn.innerHTML = '<div class="loader"></div>';
+            searchTimeout = setTimeout(() => performSearch(query), 500); // Debounce
+        });
 
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    fetchWeather(latitude, longitude, true); // True = auto cari nama jalan
-                    btn.innerHTML = originalText;
-                },
-                (error) => {
-                    let msg = "Gagal mendeteksi lokasi.";
-                    if (error.code === 1) msg = "Izin lokasi ditolak. Mohon izinkan akses lokasi di browser.";
-                    alert(msg);
-                    btn.innerHTML = originalText;
-                },
-                { enableHighAccuracy: true } // Minta akurasi tinggi (GPS)
-            );
-        }
+        async function performSearch(query) {
+            searchResults.classList.remove('hidden');
+            searchResults.innerHTML = '<div class="p-3 text-xs text-gray-400">Mencari...</div>';
 
-        // --- 4. Search Handler ---
-        async function handleSearch() {
-            const query = document.getElementById('searchInput').value;
-            if(!query) return;
-
-            // Cari koordinat kota/kecamatan dulu via Open-Meteo Geocoding
             try {
-                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=1&language=id&format=json`);
+                // Open-Meteo Geocoding
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${query}&count=5&language=id&format=json`);
                 const data = await res.json();
-                
-                if(data.results) {
-                    const { latitude, longitude, name, admin1 } = data.results[0];
-                    // Manual set nama karena hasil search user
-                    document.getElementById('locationDetail').innerText = name;
-                    document.getElementById('locationSub').innerText = admin1 || "Hasil Pencarian";
-                    
-                    fetchWeather(latitude, longitude, false); // False = jangan overwrite nama dengan reverse geo
-                } else {
-                    alert("Lokasi tidak ditemukan.");
+
+                searchResults.innerHTML = '';
+
+                if (!data.results || data.results.length === 0) {
+                    searchResults.innerHTML = '<div class="p-3 text-xs text-gray-400">Lokasi tidak ditemukan</div>';
+                    return;
                 }
-            } catch (e) {
-                alert("Error pencarian.");
+
+                // Render List Items
+                data.results.forEach(place => {
+                    const div = document.createElement('div');
+                    div.className = "px-4 py-3 hover:bg-slate-700 cursor-pointer border-b border-slate-700 last:border-0 transition flex justify-between items-center group";
+                    
+                    const country = place.country_code ? place.country_code.toUpperCase() : '';
+                    const admin = place.admin1 || place.admin2 || '';
+                    const fullLabel = `${place.name}, ${admin} ${country}`;
+
+                    div.innerHTML = `
+                        <div>
+                            <div class="text-sm text-white font-medium group-hover:text-blue-400">${place.name}</div>
+                            <div class="text-xs text-gray-400">${admin}, ${country}</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-gray-600 group-hover:text-white"></i>
+                    `;
+
+                    div.onclick = () => {
+                        getWeather(place.latitude, place.longitude, fullLabel);
+                        searchInput.value = place.name;
+                        searchResults.classList.add('hidden');
+                    };
+
+                    searchResults.appendChild(div);
+                });
+
+            } catch (err) {
+                searchResults.innerHTML = '<div class="p-3 text-xs text-red-400">Error koneksi</div>';
             }
         }
 
-        // Listeners
-        document.getElementById('searchInput').addEventListener('keypress', (e) => e.key === 'Enter' && handleSearch());
-        
-        map.on('click', (e) => {
-            fetchWeather(e.latlng.lat, e.latlng.lng, true);
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.add('hidden');
+            }
         });
 
-        // Init: Coba load lokasi user, jika gagal load Jakarta default
-        document.addEventListener("DOMContentLoaded", () => {
-             // Opsional: Langsung tanya lokasi saat web dibuka
-             // getMyLocation(); 
-             
-             // Atau load default dulu agar tidak kosong
-             fetchWeather(-6.1754, 106.8272, true); 
-        });
+        // --- 6. GEOLOCATION ---
+        function getMyLocation() {
+            if(!navigator.geolocation) return alert("Geolocation tidak didukung");
+            
+            navigator.geolocation.getCurrentPosition(
+                (pos) => getWeather(pos.coords.latitude, pos.coords.longitude, null, true),
+                () => alert("Izin lokasi ditolak")
+            );
+        }
+
+        // INIT
+        initMap();
+        getWeather(-6.2088, 106.8456, "Jakarta, Indonesia"); // Default load
 
     </script>
 </body>
